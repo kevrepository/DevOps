@@ -1,0 +1,106 @@
+# Basic node identity and storage:
+# - name: the unique name of this etcd member. It must match the name used
+#   in the initial-cluster configuration and must be unique within the cluster.
+# - data-dir: the directory where etcd stores all persistent data, including
+#   the WAL (write-ahead log), Raft snapshots, and the BoltDB database file.
+#   This directory must exist and be writable by the etcd service.
+name: "etcd01"
+data-dir: "/var/lib/etcd/default.etcd"
+
+# Listening settings:
+# - listen-peer-urls: the network interfaces and ports on which this member
+#   listens for incoming peer (Raft) communication from other etcd nodes.
+#   These must match reachable addresses on the host.
+# - listen-client-urls: the interfaces and ports on which this member listens
+#   for incoming client requests (etcdctl, applications, Kubernetes, etc.).
+#   It is common to expose both the node's IP and localhost for local tools.
+listen-peer-urls: "http://192.168.86.2:2380"
+listen-client-urls: "http://192.168.86.2:2379,http://127.0.0.1:2379"
+
+# Cluster communication:
+# - initial-advertise-peer-urls: the URLs this member uses to advertise its peer
+#   interface to other etcd nodes. Other members use these URLs for Raft (peer-to-peer)
+#   communication. Must match the node's reachable IP and port.
+# - advertise-client-urls: the URLs this member advertises to etcd clients.
+#   These are the addresses that clients (or other components like Kubernetes)
+#   will use to connect and issue API requests.
+initial-advertise-peer-urls: "http://192.168.86.2:2380"
+advertise-client-urls: "http://192.168.86.2:2379"
+
+# Initial cluster configuration:
+# - initial-cluster: defines all members of the etcd cluster in the form
+#   <name>=<peer-url>. This must be identical on every node during cluster bootstrap.
+# - initial-cluster-state: specifies whether the cluster is being created ("new")
+#   or an existing cluster is being joined ("existing"). Once a cluster is initialized,
+#   this value must remain "new" and must not be changed.
+# - initial-cluster-token: a unique identifier for the cluster; used to prevent
+#   accidental mixing of nodes from different clusters during initialization.
+initial-cluster: "etcd01=http://192.168.86.2:2380,etcd02=http://192.168.86.3:2380,etcd03=http://192.168.86.4:2380"
+initial-cluster-state: "new"
+initial-cluster-token: "etcd"
+
+# Additional service settings:
+# - enable-v2: enables or disables the legacy etcd v2 API. It should normally
+#   remain "false" since the v2 API is deprecated and the v3 API is the default.
+# - cors: defines allowed CORS origins for browser-based requests. "*" allows
+#   all origins, which is acceptable when etcd is not exposed publicly.
+# - listen-metrics-urls: specifies the network interfaces and ports where the
+#   Prometheus metrics endpoint (/metrics) will be served.
+enable-v2: false
+
+# Logging configuration:
+# - logger: selects the logging backend. "zap" is recommended for structured,
+#   efficient and modern logging. "capnslog" is the legacy logger.
+# - log-level: defines log verbosity ("debug", "info", "warn", "error").
+#   Use "info" for normal operation and "debug" only for troubleshooting.
+# - log-outputs: specifies where logs are written. "stderr" sends logs to journald,
+#   while file paths can be used for persistent log files. Multiple outputs are allowed.
+log-level: "info"
+
+# Automatic compaction:
+# - auto-compaction-mode: "periodic" cleans up old revisions based on time.
+# - auto-compaction-retention: how long to retain history ("1h" = last 1 hour).
+
+# Snapshot and WAL retention:
+# - snapshot-count: creates an internal snapshot after every N key-value changes.
+# - max-snapshots: maximum number of Raft snapshot files to retain.
+# - max-wals: maximum number of WAL (write-ahead log) segments to retain.
+  
+# Raft timing settings:
+# - heartbeat-interval: how often the leader sends heartbeat messages to followers (in milliseconds).
+# - election-timeout: the time a follower waits without receiving a heartbeat before starting a new leader election (in milliseconds).
+
+# Backend storage tuning (BoltDB):
+# - quota-backend-bytes: maximum size of the BoltDB file; etcd rejects writes when exceeded.
+# - backend-batch-limit: number of operations to batch before committing (0 = auto).
+# - backend-batch-interval: max time to wait before committing a batch (0 = auto).
+
+# Request and transaction limits:
+# - max-txn-ops: limits the maximum number of operations allowed within a
+#   single etcd transaction (PUT, DELETE, comparisons, etc.). This prevents
+#   overly large transactions from impacting Raft performance.
+# - max-request-bytes: defines the maximum size of an incoming client request
+#   (including full transaction payload). Requests exceeding this limit are
+#   rejected to protect the cluster from oversized writes that could degrade
+#   performance or overload the Raft log.
+
+# gRPC connection keepalive settings:
+# - grpc-keepalive-min-time: minimum allowed interval between client
+#   keepalive pings. If clients send keepalives more frequently, etcd will
+#   close the connection to prevent excessive ping traffic.
+# - grpc-keepalive-timeout: how long the server waits for a keepalive ping
+#   response before considering the connection dead and closing it.
+#
+# Experimental features:
+# - experimental-enable-v2v3: enables simultaneous support for both the
+#   deprecated v2 API and the v3 API. This feature is experimental and should
+#   generally remain disabled.
+# - experimental-initial-corrupt-check: performs a data corruption check on
+#   startup. If corruption is detected, the node refuses to start. Helps prevent
+#   spreading corrupted data to the cluster.
+# - experimental-watch-progress-notify-interval: sends periodic "progress"
+#   notifications to watch clients even when no key updates occur. Useful for
+#   detecting stalled watches and maintaining revision awareness.
+# - experimental-peer-skip-verify: if TLS is enabled for peer communication,
+#   this disables certificate verification. This is insecure and should normally
+#   remain "false".
