@@ -71,7 +71,7 @@ Wants=network-online.target
 [Service]
 User=etcd
 Type=notify
-ExecStart=/usr/local/bin/etcd --config-file=/etc/etcd/etcd.conf.yml
+ExecStart=/usr/local/bin/etcd --config-file=/etc/etcd/etcd.yml
 Restart=on-failure
 LimitNOFILE=65536
 
@@ -82,7 +82,7 @@ EOF
 
 **Комментарий:**\
 Сервис запускается от пользователя `etcd`, использует конфигурационный
-файл `/etc/etcd/etcd.conf.yml`.
+файл `/etc/etcd/etcd.yml`.
 
 ------------------------------------------------------------------------
 
