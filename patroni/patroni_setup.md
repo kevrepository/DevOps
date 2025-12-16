@@ -1,64 +1,10 @@
-# Установка и настройка etcd и Patroni
+# Установка и настройка Patroni (PostgreSQL HA)
 
-Пошаговый гайд с комментариями, пояснениями и готовыми командами  
-для развёртывания **etcd** и **Patroni (PostgreSQL HA)**.
-
----
-
-# Часть 1. Установка и настройка etcd
+Пошаговый гайд по установке и запуску **Patroni** для управления кластером PostgreSQL.
 
 ---
 
-## 1. Клонирование репозитория и сборка etcd
-
-```bash
-git clone -b v3.6.0 https://github.com/etcd-io/etcd.git
-cd etcd/
-./scripts/build.sh
-```
-
-**Комментарий:**  
-Скрипт `build.sh` собирает бинарные файлы `etcd` и `etcdctl` в каталоге `./bin`.
-
----
-
-## 2. Копирование бинарников
-
-```bash
-cp ./bin/* /usr/local/bin/
-```
-
-**Комментарий:**  
-Размещаем бинарные файлы в стандартном системном каталоге, чтобы они были доступны из любого места.
-
----
-
-## 3. Создание системного пользователя etcd
-
-```bash
-useradd --system --home /var/lib/etcd --shell /sbin/nologin etcd
-```
-
-**Комментарий:**  
-Пользователь не имеет shell и предназначен только для запуска сервиса.
-
----
-
-## 4. Подготовка каталогов данных etcd
-
-```bash
-mkdir -p /var/lib/etcd
-chown -R etcd:etcd /var/lib/etcd
-chmod 700 /var/lib/etcd
-```
-
----
-
-# Часть 2. Установка и настройка Patroni
-
----
-
-## 5. Подготовка каталогов PostgreSQL
+## 1. Подготовка каталога данных PostgreSQL
 
 ```bash
 mkdir -p /var/lib/pgsql/17/data/
@@ -66,9 +12,12 @@ chown -R postgres:postgres /var/lib/pgsql/17/data/
 chmod 700 /var/lib/pgsql/17/data/
 ```
 
+**Комментарий:**  
+Создаётся каталог данных PostgreSQL 17 с корректными правами доступа.
+
 ---
 
-## 6. Каталоги Patroni
+## 2. Создание каталогов Patroni
 
 ```bash
 mkdir -p /etc/patroni
@@ -77,9 +26,14 @@ mkdir -p /opt/patroni
 chown -R postgres:postgres /opt/patroni /etc/patroni /var/log/patroni
 ```
 
+**Комментарий:**  
+- `/etc/patroni` — конфигурационные файлы  
+- `/var/log/patroni` — логи  
+- `/opt/patroni` — виртуальное окружение Python  
+
 ---
 
-## 7. Python virtualenv
+## 3. Создание Python virtualenv
 
 ```bash
 sudo -iu postgres
@@ -87,18 +41,60 @@ python3 -m venv /opt/patroni/venv
 source /opt/patroni/venv/bin/activate
 ```
 
+**Комментарий:**  
+Patroni устанавливается в отдельное виртуальное окружение Python.
+
 ---
 
-## 8. Установка Patroni
+## 4. Установка Patroni и зависимостей
 
 ```bash
 pip install --upgrade pip
 pip install patroni[etcd] psycopg2-binary
 ```
 
+**Комментарий:**  
+- `patroni[etcd]` — Patroni с поддержкой DCS  
+- `psycopg2-binary` — драйвер PostgreSQL  
+
 ---
 
-## 9. systemd-сервис Patroni
+## 5. Проверка установки
+
+```bash
+patroni --version
+```
+
+**Комментарий:**  
+Проверяем, что Patroni установлен и доступен.
+
+---
+
+## 6. Тестовый запуск Patroni
+
+```bash
+patroni /etc/patroni/patroni.yml
+```
+
+**Комментарий:**  
+Ручной запуск для проверки корректности конфигурации.
+
+---
+
+## 7. Проверка состояния кластера
+
+```bash
+patronictl -c /etc/patroni/patroni.yml list
+```
+
+**Комментарий:**  
+Отображает текущее состояние кластера Patroni.
+
+---
+
+## 8. systemd-сервис Patroni
+
+Файл: `/etc/systemd/system/patroni.service`
 
 ```ini
 [Unit]
@@ -108,13 +104,38 @@ Wants=network.target
 
 [Service]
 Type=simple
+
 User=postgres
 Group=postgres
+
 ExecStart=/opt/patroni/venv/bin/patroni /etc/patroni/patroni.yml
+
+RuntimeDirectory=patroni
+RuntimeDirectoryMode=0755
+
 Restart=always
 RestartSec=5
+
 LimitNOFILE=10240
 
 [Install]
 WantedBy=multi-user.target
+```
+
+---
+
+## 9. Активация и запуск сервиса
+
+```bash
+systemctl daemon-reload
+systemctl enable patroni
+systemctl start patroni
+```
+
+---
+
+## 10. Проверка статуса сервиса
+
+```bash
+systemctl status patroni
 ```
