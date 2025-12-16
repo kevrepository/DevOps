@@ -1,0 +1,213 @@
+scope: pgcluster
+namespace: /service/
+name: db1
+
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: 192.168.86.5:8008
+
+etcd3:
+  hosts: 
+    - 192.168.86.2:2379
+    - 192.168.86.3:2379
+    - 192.168.86.4:2379
+
+bootstrap:
+  dcs:
+  # Cluster-wide timing and failover behavior:
+  # - ttl: Time-to-live of the leader key in DCS. Leader must refresh TTL
+  #   before expiration. Default: 30.
+  # - loop_wait: Interval (seconds) of Patroni’s main control loop.
+  #   Leader refreshes TTL every loop. Default: 10.
+  # - retry_timeout: Maximum time Patroni retries critical operations
+  #   (e.g., acquiring leader lock) before failing.
+  #   Default: 10.
+  # - maximum_lag_on_failover: Maximum allowed WAL lag (in bytes) for
+  #   replica to become a leader. Default: 1048576.
+  # - failsafe_mode: Enables DCS failsafe mode. Prevents failover when DCS
+  #   is unavailable, avoiding split-brain. Default: false.
+  # - synchronous_mode: Enables synchronous replication. Patroni chooses
+  #   synchronous standby automatically. Default: false.
+  # - synchronous_mode_strict: If enabled, writes block when no sync
+  #   standby is available. Default: false.
+  # - synchronous_node_count: Number of required synchronous replicas.
+  #   Default: 1.
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    failsafe_mode: false
+    synchronous_mode: false
+    synchronous_mode_strict: false
+    synchronous_node_count: 1
+    
+    postgresql:
+    # PostgreSQL configuration parameters (cluster-wide):
+    # - use_pg_rewind:
+    #   Enables pg_rewind to automatically resync an old primary.
+    #   Default: true.
+    # - use_slots:
+    #   Enables physical replication slots. Default: true.
+    # - parameters:
+    #   Any PostgreSQL config parameter allowed in postgresql.conf.
+    #   Defaults shown here are typical.
+    # - pg_hba:
+    #   Rules written into pg_hba.conf for all cluster nodes.
+    #   Default: empty list.
+    # - recovery_conf:
+    #   Settings used during recovery (replicas). Default: empty.
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+      # PostgreSQL minimal parameters required for Patroni replication:
+      # - wal_level:
+      #   Mandatory parameter enabling WAL generation sufficient
+      #   for physical replication. Without this, replicas cannot work.
+      #   Default: replica.
+      # - hot_standby:
+      #   Allows standby nodes to run read-only queries while applying WAL.
+      #   Must be enabled on replicas. Default: on.
+      # - max_wal_senders:
+      #   Number of background WAL sender processes.
+      #   Needed for replicas + pg_rewind operations.
+      #   Minimum: 1, recommended: 10.
+      # - max_replication_slots:
+      #   Number of replication slots.
+      #   Ensures WAL is retained until replicas consume it.
+      #   Minimum: 1, recommended: 10.
+      # - wal_log_hints:
+      #   Required for pg_rewind to operate correctly.
+      #   Allows WAL to track page-level changes.
+      #   Default: off → must be enabled!
+      #
+      # NOTE:
+      # These parameters represent the **absolute minimum** required
+      # for a PostgreSQL node to operate as a Patroni-managed replica.
+      # Without any of them, standby startup or replication may fail.
+        wal_level: replica
+        hot_standby: 'on'
+        max_wal_senders: 10
+        max_replication_slots: 10
+        wal_log_hints: 'on'
+
+      pg_hba:
+        - local all postgres peer
+        - local all all peer
+        - host replication replicator 0.0.0.0/0 scram-sha-256
+        - host all all 0.0.0.0/0 scram-sha-256
+      
+      recovery_conf:
+        restore_command: ''
+  
+  initdb:
+  # PostgreSQL cluster initialization options (initdb):
+  # - encoding:
+  #     Default database encoding.
+  # - data-checksums:
+  #     Enables data page checksums.
+  #     Strongly recommended for production to detect data corruption.
+  # - locale:
+  #     Sets default locale for the cluster.
+  #     Affects collation and character classification.
+  # - lc-collate:
+  #     Controls string sort order.
+  # - lc-ctype:
+  #     Controls character classification.
+  # - auth-host:
+  #     Authentication method for TCP/IP connections.
+  # - auth-local:
+  #     Authentication method for local Unix-socket connections.
+     - encoding: UTF8
+     - data-checksums
+     - locale: ru_RU.UTF-8
+     - auth-host: scram-sha-256
+     - auth-local: peer
+  #users:
+  # PostgreSQL roles created during cluster bootstrap:
+  # - replicator:
+  #     Dedicated replication user.
+  #     Used for streaming replication and basebackup.
+  #     Should have only REPLICATION privilege.
+  # - admin:
+  #     Administrative user without superuser rights.
+  #     Can create databases and roles.
+  #     Recommended instead of using postgres superuser.
+  # NOTE:
+  # Users defined here are created ONLY during initial bootstrap.
+  # Changes to this section do NOT affect an existing cluster.
+  # To manage users later, use standard SQL (CREATE/ALTER ROLE).
+  #  replicator:
+  #    password: repl_pass
+  #    options:
+  #      - replication
+  #  admin:
+  #    password: admin_pass
+  #    options:
+  #      - createrole
+  #      - createdb
+
+postgresql:
+# PostgreSQL node configuration (Patroni-managed):
+# listen:
+#     Address and port PostgreSQL listens on.
+#     Usually 0.0.0.0:5432 to accept connections on all interfaces.
+# connect_address:
+#     Address and port advertised to other cluster members.
+#     Must be reachable by all Patroni nodes.
+# data_dir:
+#     PostgreSQL data directory.
+#     Must be empty on first bootstrap.
+# bin_dir:
+#     Directory containing PostgreSQL binaries.
+#     Obtain with: pg_config --bindir
+# pgpass:
+#     Path to .pgpass file used by Patroni for authentication.
+#
+# authentication.superuser:
+#     Credentials for PostgreSQL superuser.
+#     Used by Patroni to manage the cluster.
+#
+# authentication.replication:
+#     Credentials for replication user.
+#     Used for streaming replication and basebackup.
+#
+# parameters:
+#     PostgreSQL configuration parameters (postgresql.conf).
+#     Applied cluster-wide via Patroni.
+#
+# use_unix_socket:
+#     Enables connections via Unix domain sockets.
+#     Usually should be enabled.
+#
+# NOTE:
+# This section is node-specific.
+# Some parameters are local (listen, connect_address),
+# while postgresql.parameters are cluster-wide.
+  listen: 0.0.0.0:5432
+  connect_address: 192.168.86.5:5432
+  data_dir: /var/lib/pgsql/17/data/
+  bin_dir: /usr/pgsql-17/bin/
+  authentication:
+    superuser:
+      username: postgres
+      password: postgres
+    replication:
+      username: replicator
+      password: replicator
+  parameters:
+  use_unix_socket: true
+
+tags:
+# Patroni Node Tags (affect node behavior):
+# - nofailover:
+#   Prevents a node from becoming a leader. Default: false.
+# - noloadbalance:
+#   Excludes node from read-balancing. Default: false.
+# - clonefrom:
+#   Preferred node for basebackup cloning. Default: false.
+# - nosync:
+#   Node cannot be chosen as synchronous standby. Default: false.
+  nofailover: false
+  noloadbalance: false
+  clonefrom: false
+  nosync: false
